@@ -1,7 +1,8 @@
 package main
 
 import (
-	"io/ioutil"
+	"bufio"
+	"io"
 	"log"
 	"os"
 	"regexp"
@@ -67,12 +68,17 @@ func convertgenericaudio(justFileName []string, foldertoconvertfrom string, full
 }
 
 func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup) {
-	//var activationbytes
-	activationbytes, err := ioutil.ReadFile("activation_bytes.txt")
-	if err != nil {
+
+	//this reads the first line of the text file activation_bytes.txt and uses it to decrypt your aax file
+	activaitonfile, _ := os.Open("activation_bytes.txt")
+	reader := bufio.NewReader(activaitonfile)
+	line, _, err := reader.ReadLine()
+	if err == io.EOF {
 		log.Fatal(err)
 	}
-	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": activationbytes}).
+	activationbytes := line
+
+	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": string(activationbytes)}).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"vn": "", "c:a": "copy"}).
 		OverWriteOutput().ErrorToStdOut().Run()
 	wg.Done()
