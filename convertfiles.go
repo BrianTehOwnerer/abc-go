@@ -18,9 +18,19 @@ func main() {
 	//Accepts the first cli argument as the folder
 	var foldertoconvertfrom string = os.Args[1]
 	var filenameregex = regexp.MustCompile(`(\.\w*$)`)
-
 	var regexforendslash = regexp.MustCompile("/$")
 	var regexAAX = regexp.MustCompile(".[a,A]{2}[x,X]$")
+
+	// This gets your personal activation bytes from the file activation_bytes.txt file from the same
+	// folder as your program folder.
+	activaitonfile, _ := os.Open("activation_bytes.txt")
+	reader := bufio.NewReader(activaitonfile)
+	line, _, err := reader.ReadLine()
+	if err == io.EOF {
+		log.Fatal(err)
+	}
+	activationbytes := line
+
 	// Checks the folder you pass to the executable and adds a trailing slash if needed
 	// If you pass it a . it sets it as current working directory
 	if foldertoconvertfrom == "." || len(foldertoconvertfrom) == 0 {
@@ -49,7 +59,7 @@ func main() {
 
 		wg.Add(1)
 		if regexAAX.MatchString(file.Name()) {
-			go convertaax(justFileName, foldertoconvertfrom, fullfilename, &wg)
+			go convertaax(justFileName, foldertoconvertfrom, fullfilename, &wg, activationbytes)
 		} else {
 			go convertgenericaudio(justFileName, foldertoconvertfrom, fullfilename, &wg)
 		}
@@ -67,17 +77,7 @@ func convertgenericaudio(justFileName []string, foldertoconvertfrom string, full
 	wg.Done()
 }
 
-func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup) {
-
-	//this reads the first line of the text file activation_bytes.txt and uses it to decrypt your aax file
-	activaitonfile, _ := os.Open("activation_bytes.txt")
-	reader := bufio.NewReader(activaitonfile)
-	line, _, err := reader.ReadLine()
-	if err == io.EOF {
-		log.Fatal(err)
-	}
-	activationbytes := line
-
+func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, activationbytes string, wg *sync.WaitGroup) {
 	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": string(activationbytes)}).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"vn": "", "c:a": "copy"}).
 		OverWriteOutput().ErrorToStdOut().Run()
