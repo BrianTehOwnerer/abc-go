@@ -1,8 +1,6 @@
 package main
 
 import (
-	//"bufio"
-	//"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -111,6 +109,7 @@ func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
 		log.Fatalln(err)
 	}
 	defer resp.Body.Close()
+	resp.Header.Set("User-Agent:", "abc-go/1.0")
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
