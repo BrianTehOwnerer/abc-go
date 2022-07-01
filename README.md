@@ -1,4 +1,4 @@
-# Audio Book Converter-go
+# Audio Book Converter
 Audio Book Converter writen in go
 This is the start to yet another audiobook converter.
 It takes all the files in a folder, and converts them all to m4b files for itunes and other audiobook managers can use.
