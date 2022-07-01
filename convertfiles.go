@@ -80,10 +80,14 @@ func getaaxchecksum(fullFilename string, foldertoconvertfrom string) string {
 	if err != nil {
 		fmt.Println("error opening file")
 	}
+	//this sets the size of checksumbytes to 20 bytes long (which is the size of the aax file checksum)
 	checksumbytes := make([]byte, 20)
 
+	//jumps to the 653rd byte of the aax file and reads in the next 20 bytes
 	aaxfile.Seek(653, 0)
 	aaxfile.Read(checksumbytes)
+
+	//takes the raw binarydata and converts it to hex encoding
 	var checksum string = string(hex.EncodeToString(checksumbytes))
 	return checksum
 }
@@ -102,6 +106,7 @@ func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename 
 	wg.Done()
 }
 
+//this function takes the checksum we found in getaaxchecksum and makes an API call to get the decryption bytes
 func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
 	checksum := getaaxchecksum(fullFileName, foldertoconvertfrom)
 	resp, err := http.Get("https://aax.api.j-kit.me/api/v2/activation/" + checksum)
@@ -114,8 +119,10 @@ func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	//reads in the https responce data and makes a maped string list
 	var apiresponce map[string]interface{}
 	json.Unmarshal(body, &apiresponce)
+	//sets activationkey to the responded api's "activationBytes"
 	activationkey := fmt.Sprintf("%v", apiresponce["activationBytes"])
 
 	return activationkey
