@@ -1,9 +1,14 @@
 package main
 
 import (
-	"bufio"
-	"io"
+	//"bufio"
+	//"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"regexp"
 	"sync"
@@ -22,14 +27,15 @@ func main() {
 	var regexAAX = regexp.MustCompile(".[a,A]{2}[x,X]$")
 
 	// This gets your personal activation bytes from the file activation_bytes.txt file from the same
-	// folder as your program folder.
-	activaitonfile, _ := os.Open("activation_bytes.txt")
-	reader := bufio.NewReader(activaitonfile)
-	line, _, err := reader.ReadLine()
-	if err == io.EOF {
-		log.Fatal(err)
-	}
-	activationbytes := line
+	// folder as your program folder. this is legacy code, now it gets the activation code automaticly
+	/*	activaitonfile, _ := os.Open("activation_bytes.txt")
+		reader := bufio.NewReader(activaitonfile)
+		line, _, err := reader.ReadLine()
+		if err == io.EOF {
+			log.Fatal(err)
+		}
+		activationbytes := line
+	*/
 
 	// Checks the folder you pass to the executable and adds a trailing slash if needed
 	// If you pass it a . it sets it as current working directory
@@ -54,14 +60,15 @@ func main() {
 	// splits it into two parts, the first being the file name, second is the file extention...//
 	for _, file := range files {
 
-		fullfilename := file.Name()
+		fullfileName := file.Name()
 		justFileName := filenameregex.Split(file.Name(), 2)
 
 		wg.Add(1)
 		if regexAAX.MatchString(file.Name()) {
-			go convertaax(justFileName, foldertoconvertfrom, fullfilename, &wg, activationbytes)
+			activationkey := getactivationkey(fullfileName, foldertoconvertfrom)
+			go convertaax(justFileName, foldertoconvertfrom, fullfileName, &wg, activationkey)
 		} else {
-			go convertgenericaudio(justFileName, foldertoconvertfrom, fullfilename, &wg)
+			go convertgenericaudio(justFileName, foldertoconvertfrom, fullfileName, &wg)
 		}
 	}
 	wg.Wait()
@@ -70,6 +77,19 @@ func main() {
 //runs ffmpeg with the given options and coverts from any audio file to an m4a file, with the file extenion m4b
 // which is the standard for audio books.
 
+func getaaxchecksum(fullFilename string, foldertoconvertfrom string) string {
+	aaxfile, err := os.Open(foldertoconvertfrom + fullFilename)
+	if err != nil {
+		fmt.Println("error opening file")
+	}
+	checksumbytes := make([]byte, 20)
+
+	aaxfile.Seek(653, 0)
+	aaxfile.Read(checksumbytes)
+	var checksum string = string(hex.EncodeToString(checksumbytes))
+	return checksum
+}
+
 func convertgenericaudio(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup) {
 	ffmpeg_go.Input(foldertoconvertfrom+fullfilename).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"c:a": "aac", "c:v": "copy", "af": "dynaudnorm"}).
@@ -77,9 +97,28 @@ func convertgenericaudio(justFileName []string, foldertoconvertfrom string, full
 	wg.Done()
 }
 
-func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, activationbytes string, wg *sync.WaitGroup) {
-	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": string(activationbytes)}).
+func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup, activationbytes string) {
+	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": activationbytes}).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"vn": "", "c:a": "copy"}).
 		OverWriteOutput().ErrorToStdOut().Run()
 	wg.Done()
+}
+
+func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
+	checksum := getaaxchecksum(fullFileName, foldertoconvertfrom)
+	resp, err := http.Get("https://aax.api.j-kit.me/api/v2/activation/" + checksum)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var apiresponce map[string]interface{}
+	json.Unmarshal(body, &apiresponce)
+	activationkey := fmt.Sprintf("%v", apiresponce["activationBytes"])
+
+	return activationkey
+
 }
