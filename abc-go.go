@@ -19,11 +19,12 @@ func main() {
 
 	var wg = sync.WaitGroup{}
 	var folder string
-	var getchecksum, getactivationbytes, recursive bool
+	var getchecksum, getactivationbytes, recursive, deletefiles bool
 	flag.StringVar(&folder, "folder", ".", "Specify the name of the folder you wish to convert.")
 	flag.BoolVar(&getchecksum, "checksum", false, "Get the checksum of all AAX audible Files in a directory. Does not convert audio files.")
 	flag.BoolVar(&getactivationbytes, "activationbytes", false, "Get the activation bytes of your audible AAX files. Does not convert any audio files.")
 	flag.BoolVar(&recursive, "recursive", false, "Recursivly go through sub folders, default is false.")
+	flag.BoolVar(&deletefiles, "deletefiles", false, "Delete files once the conversion is complete.")
 	flag.Parse()
 	//Accepts the first cli argument as the folder
 	var foldertoconvertfrom string = folder
@@ -73,9 +74,9 @@ func main() {
 			wg.Add(1)
 			if regexAAX.MatchString(file.Name()) {
 				activationkey := getactivationkey(fullfileName, foldertoconvertfrom)
-				go convertaax(justFileName, foldertoconvertfrom, fullfileName, &wg, activationkey)
+				go convertaax(justFileName, foldertoconvertfrom, fullfileName, deletefiles, &wg, activationkey)
 			} else {
-				go convertgenericaudio(justFileName, foldertoconvertfrom, fullfileName, &wg)
+				go convertgenericaudio(justFileName, foldertoconvertfrom, fullfileName, deletefiles, &wg)
 			}
 		}
 		wg.Wait()
@@ -120,17 +121,23 @@ func getaaxchecksum(fullFilename string, foldertoconvertfrom string) string {
 	return checksum
 }
 
-func convertgenericaudio(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup) {
+func convertgenericaudio(justFileName []string, foldertoconvertfrom string, fullfilename string, deletefiles bool, wg *sync.WaitGroup) {
 	ffmpeg_go.Input(foldertoconvertfrom+fullfilename).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"c:a": "aac", "c:v": "copy", "af": "dynaudnorm"}).
 		OverWriteOutput().Run()
+	if deletefiles == true {
+		os.Remove(foldertoconvertfrom + fullfilename)
+	}
 	wg.Done()
 }
 
-func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, wg *sync.WaitGroup, activationbytes string) {
+func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename string, deletefiles bool, wg *sync.WaitGroup, activationbytes string) {
 	ffmpeg_go.Input(foldertoconvertfrom+fullfilename, ffmpeg_go.KwArgs{"activation_bytes": activationbytes}).
 		Output(foldertoconvertfrom+justFileName[0]+".m4b", ffmpeg_go.KwArgs{"vn": "", "c:a": "copy"}).
 		OverWriteOutput().Run()
+	if deletefiles == true {
+		os.Remove(foldertoconvertfrom + fullfilename)
+	}
 	wg.Done()
 }
 
