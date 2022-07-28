@@ -24,7 +24,7 @@ func main() {
 	flag.BoolVar(&getchecksum, "checksum", false, "Get the checksum of all AAX audible Files in a directory. Does not convert audio files.")
 	flag.BoolVar(&getactivationbytes, "activationbytes", false, "Get the activation bytes of your audible AAX files. Does not convert any audio files.")
 	flag.BoolVar(&recursive, "recursive", false, "Recursivly go through sub folders, default is false.")
-	flag.BoolVar(&deletefiles, "deletefiles", false, "Delete files once the conversion is complete.")
+	flag.BoolVar(&deletefiles, "deletefiles", false, "Delete files once the conversion is complete. Understand, this does not care if the file was a lost pet, or an mp3 file. if its in the folder it WILL be deleted.")
 	flag.Parse()
 	//Accepts the first cli argument as the folder
 	var foldertoconvertfrom string = folder
@@ -101,7 +101,8 @@ func main() {
 	}
 }
 
-//runs ffmpeg with the given options and coverts from any audio file to an m4a file, with the file extenion m4b
+//runs ffmpeg with the given options and coverts from any audio file to an m4a file,
+// with the file extenion m4b
 // which is the standard for audio books.
 
 func getaaxchecksum(fullFilename string, foldertoconvertfrom string) string {
