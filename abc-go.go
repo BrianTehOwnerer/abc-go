@@ -20,17 +20,20 @@ func main() {
 	var wg = sync.WaitGroup{}
 	var folder string
 	var getchecksum, getactivationbytes, recursive, deletefiles bool
+
+	//this is the flag section of the program, pretty self explnetory.
 	flag.StringVar(&folder, "folder", ".", "Specify the name of the folder you wish to convert.")
 	flag.BoolVar(&getchecksum, "checksum", false, "Get the checksum of all AAX audible Files in a directory. Does not convert audio files.")
 	flag.BoolVar(&getactivationbytes, "activationbytes", false, "Get the activation bytes of your audible AAX files. Does not convert any audio files.")
 	flag.BoolVar(&recursive, "recursive", false, "Recursivly go through sub folders, default is false.")
 	flag.BoolVar(&deletefiles, "deletefiles", false, "Delete files once the conversion is complete. Understand, this does not care if the file was a lost pet, or an mp3 file. if its in the folder it WILL be deleted.")
 	flag.Parse()
-	//Accepts the first cli argument as the folder
+
 	var foldertoconvertfrom string = folder
 	var filenameregex = regexp.MustCompile(`(\.\w*$)`)
 	var regexforendslash = regexp.MustCompile("/$")
 	var regexAAX = regexp.MustCompile(".[a,A]{2}[x,X]$")
+	var regexisaudiofile = regexp.MustCompile("(?i).(?:wav|mp3|m4a|ogg|flac|aiff|aac|wma|alac|mp4)$")
 
 	// This gets your personal activation bytes from the file activation_bytes.txt file from the same
 	// folder as your program folder. this is legacy code, now it gets the activation code automaticly
@@ -56,13 +59,13 @@ func main() {
 		foldertoconvertfrom = foldertoconvertfrom + "/"
 	}
 
-	//Iterates over a folder and gets all files from it, adding it to file.Name()
+	// Iterates over a folder and gets all files from it, adding it to file.Name()
 	files, err := os.ReadDir(foldertoconvertfrom)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//for eatch file in files
+	// for eatch file in files
 	// splits it into two parts, the first being the file name, second is the file extention...//
 	// but only if we did not get asked for activationbytes or checksum value, if they were true skip this section
 	if !getchecksum && !getactivationbytes {
@@ -75,7 +78,8 @@ func main() {
 			if regexAAX.MatchString(file.Name()) {
 				activationkey := getactivationkey(fullfileName, foldertoconvertfrom)
 				go convertaax(justFileName, foldertoconvertfrom, fullfileName, deletefiles, &wg, activationkey)
-			} else {
+			}
+			if regexisaudiofile.MatchString(file.Name()) {
 				go convertgenericaudio(justFileName, foldertoconvertfrom, fullfileName, deletefiles, &wg)
 			}
 		}
@@ -101,7 +105,7 @@ func main() {
 	}
 }
 
-//runs ffmpeg with the given options and coverts from any audio file to an m4a file,
+// runs ffmpeg with the given options and coverts from any audio file to an m4a file,
 // with the file extenion m4b
 // which is the standard for audio books.
 
@@ -110,14 +114,14 @@ func getaaxchecksum(fullFilename string, foldertoconvertfrom string) string {
 	if err != nil {
 		fmt.Println("error opening file")
 	}
-	//this sets the size of checksumbytes to 20 bytes long (which is the size of the aax file checksum)
+	// this sets the size of checksumbytes to 20 bytes long (which is the size of the aax file checksum)
 	checksumbytes := make([]byte, 20)
 
-	//jumps to the 653rd byte of the aax file and reads in the next 20 bytes
+	// jumps to the 653rd byte of the aax file and reads in the next 20 bytes
 	aaxfile.Seek(653, 0)
 	aaxfile.Read(checksumbytes)
 
-	//takes the raw binarydata and converts it to hex encoding
+	// takes the raw binarydata and converts it to hex encoding
 	var checksum string = string(hex.EncodeToString(checksumbytes))
 	return checksum
 }
@@ -142,7 +146,7 @@ func convertaax(justFileName []string, foldertoconvertfrom string, fullfilename 
 	wg.Done()
 }
 
-//this function takes the checksum we found in getaaxchecksum and makes an API call to get the decryption bytes
+// this function takes the checksum we found in getaaxchecksum and makes an API call to get the decryption bytes
 func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
 	checksum := getaaxchecksum(fullFileName, foldertoconvertfrom)
 	resp, err := http.Get("https://aax.api.j-kit.me/api/v2/activation/" + checksum)
@@ -155,10 +159,10 @@ func getactivationkey(fullFileName string, foldertoconvertfrom string) string {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	//reads in the https responce data and makes a maped string list
+	// reads in the https responce data and makes a maped string list
 	var apiresponce map[string]interface{}
 	json.Unmarshal(body, &apiresponce)
-	//sets activationkey to the responded api's "activationBytes"
+	// sets activationkey to the responded api's "activationBytes"
 	activationkey := fmt.Sprintf("%v", apiresponce["activationBytes"])
 
 	return activationkey
